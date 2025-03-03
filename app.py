@@ -3,6 +3,8 @@ import warnings
 import time
 import streamlit as st
 from PyPDF2 import PdfReader
+import pandas as pd
+import docx
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -47,14 +49,26 @@ def simulate_typing(text, placeholder, typing_speed=0.0001):
 
 
 # Function to extract text from PDFs
-def get_doc_text(docs):
+def get_pdf_text(doc):
     logger.info("Extracting text from uploaded Files...")
     text = ""
-    for doc in docs:
-        pdf_reader = PdfReader(doc)
-        for page in pdf_reader.pages:
-            text += page.extract_text()
+    # for doc in docs:
+    pdf_reader = PdfReader(doc)
+    for page in pdf_reader.pages:
+        text += page.extract_text()
     logger.info("Doc text extraction complete.")
+    return text
+
+
+# Function to extract text from DOCX files
+def get_docx_text(doc):
+    logger.info("Extracting text from uploaded DOCX files...")
+    text = ""
+    # for doc in docs:
+    docx_reader = docx.Document(doc)
+    for para in docx_reader.paragraphs:
+        text += para.text + "\n"
+    logger.info("DOCX text extraction complete.")
     return text
 
 
@@ -120,8 +134,8 @@ def user_input(user_question):
 # Main function for Streamlit app
 def main():
 
-    st.set_page_config("Multi PDF Chatbot", page_icon=":scroll:")
-    st.header("Multi-PDF's 🗐 - Chat Agent 🤖 ")
+    st.set_page_config("Multi Files Chatbot", page_icon=":scroll:")
+    st.header("Multi-File's 🗐 - Chat Bot 🤖 ")
 
     # Display previous chat history
     # Initialize the session state for storing chat messages and chat history
@@ -133,12 +147,22 @@ def main():
         st.session_state.active_chat_index = None  # Tracks which chat is currently active
 
     with st.sidebar:
-        st.title("📁 Upload PDF File's Section")
-        docs = st.file_uploader("Upload your PDF Files & Click on Submit & Process", accept_multiple_files=True)
+        st.title("📁 Upload File's Section")
+        files = st.file_uploader("Upload your Files(PDF, DOCX, CSV, XLSX, and TxT) & Click on Submit & Process", accept_multiple_files=True)
 
         if st.button("Submit & Process"):
             with st.spinner("Processing..."):
-                raw_text = get_doc_text(docs)
+                #
+                raw_text = ""
+                for file in files:
+                    if file.name.endswith(".pdf"):
+                        raw_text += get_pdf_text(file)
+                    elif file.name.endswith(".docx"):
+                        raw_text += get_docx_text(file)
+
+                # raw_text = get_pdf_text(files)
+                # print("Raw text:")
+                # print(raw_text)
                 text_chunks = get_text_chunks(raw_text)
                 get_vector_store(text_chunks)
                 st.success("Processing complete!")
