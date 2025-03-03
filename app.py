@@ -59,6 +59,19 @@ def get_pdf_text(doc):
     logger.info("Doc text extraction complete.")
     return text
 
+
+# Function to extract text from DOCX files
+def get_docx_text(doc):
+    logger.info("Extracting text from uploaded DOCX files...")
+    text = ""
+    # for doc in docs:
+    docx_reader = docx.Document(doc)
+    for para in docx_reader.paragraphs:
+        text += para.text + "\n"
+    logger.info("DOCX text extraction complete.")
+    return text
+
+
 # Function to extract text from CSV files
 def get_csv_text(doc):
     logger.info("Extracting text from uploaded CSV files...")
@@ -86,15 +99,14 @@ def get_excel_text(doc):
     logger.info("Excel text extraction complete.")
     return text
 
-# Function to extract text from DOCX files
-def get_docx_text(doc):
-    logger.info("Extracting text from uploaded DOCX files...")
+
+# Function to extract text from TXT files
+def get_txt_text(doc):
+    logger.info("Extracting text from uploaded TXT files...")
     text = ""
     # for doc in docs:
-    docx_reader = docx.Document(doc)
-    for para in docx_reader.paragraphs:
-        text += para.text + "\n"
-    logger.info("DOCX text extraction complete.")
+    text += doc.getvalue().decode("utf-8") + "\n"  # Decode bytes to string
+    logger.info("TXT text extraction complete.")
     return text
 
 
@@ -189,6 +201,8 @@ def main():
                         raw_text += get_csv_text(file)
                     elif file.name.endswith(".xlsx") or file.name.endswith(".xls"):
                         raw_text += get_excel_text(file)
+                    elif file.name.endswith(".txt"):
+                        raw_text += get_txt_text(file)
 
                 # raw_text = get_pdf_text(files)
                 # print("Raw text:")
