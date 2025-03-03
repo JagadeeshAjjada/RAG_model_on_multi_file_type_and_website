@@ -4,6 +4,8 @@ python-dotenv
 langchain-community
 PyPDF2
 python-docx
+pandas
+openpyxl
 faiss-cpu
 langchain_google_genai
 dotenv

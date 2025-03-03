@@ -59,6 +59,32 @@ def get_pdf_text(doc):
     logger.info("Doc text extraction complete.")
     return text
 
+# Function to extract text from CSV files
+def get_csv_text(doc):
+    logger.info("Extracting text from uploaded CSV files...")
+    text = ""
+    # for doc in docs:  # Iterate over multiple files if provided
+    try:
+        df = pd.read_csv(doc)  # Read CSV file
+        text += df.to_string(index=False)  # Convert DataFrame to string
+    except Exception as e:
+        logger.error(f"Error reading CSV file {doc}: {str(e)}")
+    logger.info("CSV text extraction complete.")
+    return text
+
+
+# Function to extract text from Excel files
+def get_excel_text(doc):
+    logger.info("Extracting text from uploaded Excel files...")
+    text = ""
+    # for doc in docs:
+    try:
+        df = pd.read_excel(doc, engine="openpyxl")  # Specify the engine
+        text += df.to_string(index=False)  # Convert DataFrame to string
+    except Exception as e:
+        logger.error(f"Error reading Excel file {doc}: {str(e)}")
+    logger.info("Excel text extraction complete.")
+    return text
 
 # Function to extract text from DOCX files
 def get_docx_text(doc):
@@ -159,6 +185,10 @@ def main():
                         raw_text += get_pdf_text(file)
                     elif file.name.endswith(".docx"):
                         raw_text += get_docx_text(file)
+                    elif file.name.endswith(".csv"):
+                        raw_text += get_csv_text(file)
+                    elif file.name.endswith(".xlsx") or file.name.endswith(".xls"):
+                        raw_text += get_excel_text(file)
 
                 # raw_text = get_pdf_text(files)
                 # print("Raw text:")
