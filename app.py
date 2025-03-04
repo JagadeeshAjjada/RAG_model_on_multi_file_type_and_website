@@ -1,12 +1,16 @@
 import logging
 import warnings
 import time
+import os
+import re
 import streamlit as st
 from PyPDF2 import PdfReader
 import pandas as pd
 import docx
+from langchain_community.document_loaders import RecursiveUrlLoader
+from langchain.schema import Document
+from bs4 import BeautifulSoup
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-import os
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import google.generativeai as genai
 from langchain_community.vectorstores import FAISS
@@ -46,6 +50,25 @@ def simulate_typing(text, placeholder, typing_speed=0.0001):
         placeholder.markdown(f"{typed_text}")
         time.sleep(typing_speed)
     placeholder.markdown(f"{text}")  # Ensure the full response is displayed
+
+
+def is_common_greetings(query):
+    patterns = [
+        r"\b(hi|hello|hey|hiya|howdy|greetings|yo)\b", # Common greetings
+        r"how (are|r) you\??", # Identity questions
+        r"who (are|r) you\??", # Identity questions
+        r"what('?s| is) your name\??", # Name questions
+        r"what('?s| is) your role\??", # Role questions
+        r"(hi|hello|hey|yo),? (who are you|what('?s| is) your name)\??", # Greeting + identity
+        r"(hi|hello|hey|yo),? (what do you do|what can you do)\??", # Greeting + capability
+        r"good (morning|afternoon|evening),? (who are you|what('?s| is) your role)\??", # Polite intros
+        r"(what can you do for me)\??" # Informal assistance questions
+    ]
+    normalized = query.strip().lower()
+    for pattern in patterns:
+        if re.search(pattern, normalized):
+            return True
+    return False
 
 
 # Function to extract text from PDFs
@@ -110,6 +133,50 @@ def get_txt_text(doc):
     return text
 
 
+def load_documents_from_web(CORPUS_SOURCE):
+
+    loader = RecursiveUrlLoader(
+        url=CORPUS_SOURCE,
+        prevent_outside=True,
+        base_url=CORPUS_SOURCE,
+        max_depth=2,
+        use_async=True
+        # exclude_dirs=['https://www.csusb.edu/its/support/it-knowledge-base',
+        #               'https://www.csusb.edu/its/support/knowledge-base']
+        )
+    raw_documents = loader.load()
+
+    cleaned_documents = []
+    for doc in raw_documents:
+        cleaned_text = clean_text_from_html(doc.page_content)
+        cleaned_documents.append(Document(page_content=cleaned_text, metadata=doc.metadata))
+
+    return cleaned_documents
+
+
+def clean_text_from_html(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    # Remove unnecessary elements
+    for script_or_style in soup(['script', 'style', 'header', 'footer', 'nav']):
+        script_or_style.decompose()
+
+    main_content = soup.find('div', {'class': 'page-main-content'})
+    #main_content = soup.find('main')
+    if main_content:
+        content = main_content.get_text(separator='\n')
+    else:
+        content = soup.get_text(separator='\n')
+
+    return clean_text(content)
+
+
+def clean_text(text):
+    lines = (line.strip() for line in text.splitlines())
+    cleaned_lines = [line for line in lines if line]
+    return '\n'.join(cleaned_lines)
+
+
 # Function to split text into chunks
 def get_text_chunks(text):
     logger.info("Splitting text into chunks...")
@@ -149,6 +216,9 @@ def get_conversational_chain():
 def user_input(user_question):
     logger.info(f"Processing user query: {user_question}")
 
+    # Check if the user question is a greeting
+    if is_common_greetings(user_question):
+        return f"Hi there! I am an AI Chat Bot, How can I help you today on the uploaded files...🤔!"
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
     try:
@@ -186,12 +256,14 @@ def main():
 
     with st.sidebar:
         st.title("📁 Upload File's Section")
+
+        is_data_submitted = False
+        raw_text = ""
         files = st.file_uploader("Upload your Files(PDF, DOCX, CSV, XLSX, and TxT) & Click on Submit & Process", accept_multiple_files=True)
 
         if st.button("Submit & Process"):
             with st.spinner("Processing..."):
-                #
-                raw_text = ""
+                # Variable to hold all the uploaded files text
                 for file in files:
                     if file.name.endswith(".pdf"):
                         raw_text += get_pdf_text(file)
@@ -207,10 +279,26 @@ def main():
                 # raw_text = get_pdf_text(files)
                 # print("Raw text:")
                 # print(raw_text)
-                text_chunks = get_text_chunks(raw_text)
-                get_vector_store(text_chunks)
-                st.success("Processing complete!")
-                logger.info("PDF processing and vector storage completed.")
+                is_data_submitted = True
+
+        st.write("---")
+        st.title("📁 URL Upload Section")
+        corpus_source_url = st.text_input("Past you website URL & Click on Submit URL")
+
+        if st.button("Submit URL"):
+            with st.spinner("Processing..."):
+                # Variable to hold all the uploaded URL text data
+                data_in_object = load_documents_from_web(corpus_source_url)
+                data = data_in_object[0]
+                raw_text += data.metadata["title"] + " "
+                raw_text += data.page_content
+                is_data_submitted = True
+
+        if is_data_submitted:
+            text_chunks = get_text_chunks(raw_text)
+            get_vector_store(text_chunks)
+            st.success("Processing complete!")
+            logger.info("PDF processing and vector storage completed.")
 
         # Display previous chat history in the sidebar
         st.write("---")
