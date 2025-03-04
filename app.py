@@ -295,10 +295,11 @@ def main():
                 is_data_submitted = True
 
         if is_data_submitted:
-            text_chunks = get_text_chunks(raw_text)
-            get_vector_store(text_chunks)
-            st.success("Processing complete!")
-            logger.info("PDF processing and vector storage completed.")
+            with st.spinner("Processing..."):
+                text_chunks = get_text_chunks(raw_text)
+                get_vector_store(text_chunks)
+                st.success("Processing complete!")
+                logger.info("PDF processing and vector storage completed.")
 
         # Display previous chat history in the sidebar
         st.write("---")
